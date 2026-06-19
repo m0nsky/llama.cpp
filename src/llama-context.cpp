@@ -1692,7 +1692,9 @@ int llama_context::decode(const llama_batch & batch_inp) {
     const auto & hparams = model.hparams;
 
     const int64_t n_vocab = vocab.n_tokens();
-    const int64_t n_embd  = hparams.n_embd_inp();
+    // Use n_embd (not n_embd_inp) for decode batches: Eagle3's encoder input is wider
+    // (3 * n_embd_tgt) but the decoder batch embd uses the draft model's n_embd.
+    const int64_t n_embd  = hparams.n_embd;
 
     // when computing embeddings, all tokens are output
     const bool output_all   = cparams.embeddings;
