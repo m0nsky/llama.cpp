@@ -918,6 +918,9 @@ class MODEL_TENSOR(IntEnum):
     # eagle3
     FC                     = auto()  # feature fusion layer
     D2T                    = auto()  # draft to target vocabulary mapping
+    FC_NORM_0              = auto()  # eagle3 encoder norm for target layer 0
+    FC_NORM_1              = auto()  # eagle3 encoder norm for target layer 1
+    FC_NORM_2              = auto()  # eagle3 encoder norm for target layer 2
     # lfm2 audio
     A_ENC_NORM_CONV        = auto()
     A_ENC_LINEAR_POS       = auto()
@@ -1502,6 +1505,9 @@ TENSOR_NAMES: dict[MODEL_TENSOR, str] = {
     MODEL_TENSOR.NEXTN_SHARED_HEAD_NORM:    "blk.{bid}.nextn.shared_head_norm",
     MODEL_TENSOR.FC:                        "fc",
     MODEL_TENSOR.D2T:                       "d2t",
+    MODEL_TENSOR.FC_NORM_0:                 "fc_norm_0",
+    MODEL_TENSOR.FC_NORM_1:                 "fc_norm_1",
+    MODEL_TENSOR.FC_NORM_2:                 "fc_norm_2",
 }
 
 MODEL_TENSORS: dict[MODEL_ARCH, list[MODEL_TENSOR]] = {
@@ -4110,6 +4116,9 @@ MODEL_TENSORS: dict[MODEL_ARCH, list[MODEL_TENSOR]] = {
         MODEL_TENSOR.FFN_UP,
         MODEL_TENSOR.FC,
         MODEL_TENSOR.D2T,
+        MODEL_TENSOR.FC_NORM_0,
+        MODEL_TENSOR.FC_NORM_1,
+        MODEL_TENSOR.FC_NORM_2,
     ],
     MODEL_ARCH.MISTRAL4: [
         MODEL_TENSOR.TOKEN_EMBD,

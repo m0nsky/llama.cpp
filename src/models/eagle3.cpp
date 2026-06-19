@@ -53,6 +53,15 @@ void llama_model_eagle3::load_arch_tensors(llama_model_loader &) {
     // Feature fusion layer: projects 3 target layers to draft hidden size
     fc = create_tensor(tn(LLM_TENSOR_FC, "weight"), {n_embd_inp, n_embd}, 0);
 
+    // Per-target-layer normalization (optional - some Eagle3 models normalize target features before FC)
+    const int64_t n_embd_tgt = n_embd_inp / 3;
+    fc_norm[0] = create_tensor(tn(LLM_TENSOR_FC_NORM_0, "weight"), {n_embd_tgt}, TENSOR_NOT_REQUIRED);
+    fc_norm[1] = create_tensor(tn(LLM_TENSOR_FC_NORM_1, "weight"), {n_embd_tgt}, TENSOR_NOT_REQUIRED);
+    fc_norm[2] = create_tensor(tn(LLM_TENSOR_FC_NORM_2, "weight"), {n_embd_tgt}, TENSOR_NOT_REQUIRED);
+    if (fc_norm[0]) {
+        LLAMA_LOG_INFO("%s: EAGLE3 using fc_norm (per-target-layer normalization)\n", __func__);
+    }
+
     // Output layer (uses draft vocab size)
     output_norm = create_tensor(tn(LLM_TENSOR_OUTPUT_NORM, "weight"), {n_embd}, 0);
     output      = create_tensor(tn(LLM_TENSOR_OUTPUT,      "weight"), {n_embd, n_draft_vocab}, TENSOR_NOT_REQUIRED);
@@ -129,6 +138,25 @@ llama_model_eagle3::graph<true>::graph(const llama_model & model, const llm_grap
     ggml_tensor * cur = nullptr;
 
     cur = build_inp_embd_enc();
+
+    // Per-target-layer normalization (optional)
+    if (model.fc_norm[0]) {
+        const int64_t n_embd_tgt = hparams.n_embd_inp() / 3;
+
+        ggml_tensor * feat0 = ggml_view_2d(ctx0, cur, n_embd_tgt, n_tokens, cur->nb[1], 0);
+        ggml_tensor * feat1 = ggml_view_2d(ctx0, cur, n_embd_tgt, n_tokens, cur->nb[1], n_embd_tgt * ggml_element_size(cur));
+        ggml_tensor * feat2 = ggml_view_2d(ctx0, cur, n_embd_tgt, n_tokens, cur->nb[1], 2 * n_embd_tgt * ggml_element_size(cur));
+
+        feat0 = build_norm(feat0, model.fc_norm[0], NULL, LLM_NORM_RMS, -1);
+        cb(feat0, "fc_norm_0", -1);
+        feat1 = build_norm(feat1, model.fc_norm[1], NULL, LLM_NORM_RMS, -1);
+        cb(feat1, "fc_norm_1", -1);
+        feat2 = build_norm(feat2, model.fc_norm[2], NULL, LLM_NORM_RMS, -1);
+        cb(feat2, "fc_norm_2", -1);
+
+        cur = ggml_concat(ctx0, ggml_concat(ctx0, feat0, feat1, 0), feat2, 0);
+        cb(cur, "fc_norm_concat", -1);
+    }
 
     // Feature fusion layer
     cur = build_lora_mm(model.fc, cur);
